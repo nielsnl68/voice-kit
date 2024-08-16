@@ -9,32 +9,48 @@
 namespace esphome {
 namespace i2s_audio {
 
-
-enum class TaskEventType : uint8_t {
-  STARTING = 0,
-  STARTED,
-  RUNNING,
-  IDLE,
-  STOPPING,
-  STOPPED,
-  WARNING = 255,
-};
-
-
-struct CommandEvent {
-  bool stop;
-};
-
-struct TaskEvent {
-  TaskEventType type;
-  esp_err_t err;
-};
-
 class I2SAudioComponent;
 
-class I2SAudioIn : public Parented<I2SAudioComponent> {};
+class I2SAudioBase : public Parented<I2SAudioComponent> {
+ public:
+  void set_i2s_mode(i2s_mode_t mode) { this->i2s_mode_ = mode; }
+  void set_channel(i2s_channel_fmt_t channel) { this->channel_ = channel; }
+  void set_sample_rate(uint32_t sample_rate) { this->sample_rate_ = sample_rate; }
+  void set_bits_per_sample(i2s_bits_per_sample_t bits_per_sample) { this->bits_per_sample_ = bits_per_sample; }
 
-class I2SAudioOut : public Parented<I2SAudioComponent> {};
+  uint8_t sample_byte_size() {
+    uint8_t result = 0;
+    switch (this->bits_per_sample_) {
+      case I2S_BITS_PER_SAMPLE_8BIT:
+        result = 1;
+        break;
+      case I2S_BITS_PER_SAMPLE_16BIT:
+        result = 2;
+        break;
+      case I2S_BITS_PER_SAMPLE_24BIT:
+        result = 4;
+        break;
+      case I2S_BITS_PER_SAMPLE_32BIT:
+        result = 4;
+        break;
+    }
+    if (this->channel_ == I2S_CHANNEL_FMT_RIGHT_LEFT) {
+      result *= 2;
+    }
+    return result;
+  }
+  uint32_t get_sample_rate() { return this->sample_rate_; }
+
+ protected:
+  i2s_mode_t i2s_mode_{};
+  i2s_channel_fmt_t channel_;
+  uint32_t sample_rate_;
+  i2s_bits_per_sample_t bits_per_sample_;
+};
+
+class I2SAudioIn : public I2SAudioBase {};
+
+class I2SAudioOut : public I2SAudioBase {};
 
 class I2SAudioComponent : public Component {
  public:
@@ -54,9 +70,6 @@ class I2SAudioComponent : public Component {
   void set_bclk_pin(int pin) { this->bclk_pin_ = pin; }
   void set_lrclk_pin(int pin) { this->lrclk_pin_ = pin; }
 
-  void set_i2s_mode(i2s_mode_t mode) { this->mode_ = mode; }
-  i2s_mode_t get_i2s_mode() { return this->mode_; }
-
   void lock() { this->lock_.lock(); }
   bool try_lock() { return this->lock_.try_lock(); }
   void unlock() { this->lock_.unlock(); }
@@ -73,7 +86,6 @@ class I2SAudioComponent : public Component {
   int bclk_pin_{I2S_PIN_NO_CHANGE};
   int lrclk_pin_;
   i2s_port_t port_{};
-  i2s_mode_t mode_{};
 };
 
 }  // namespace i2s_audio
